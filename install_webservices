@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# Färger
+GREEN="\e[32m"
+RED="\e[31m"
+NC="\e[0m" # No Color
+
+echo -e "${GREEN}Välkommen till installationsskriptet!${NC}"
+echo "Välj vilken installation du vill köra:"
+echo "1) PHP + Apache"
+echo "2) MariaDB + Apache + PHP + phpMyAdmin"
+echo "3) Komplett LAMP-stack (Apache + MariaDB + PHP + phpMyAdmin + säkerhet)"
+echo "4) Avbryt"
+
+read -p "Ange ditt val (1/2/3/4): " choice
+
+if [ "$choice" == "4" ]; then
+    echo -e "${RED}Avbryter installationen.${NC}"
+    exit 0
+fi
+
+read -p "Vill du fortsätta installationen? (j/n): " confirm
+if [[ "$confirm" != "j" ]]; then
+    echo -e "${RED}Installation avbruten.${NC}"
+    exit 0
+fi
+
+sudo apt update
+
+if [ "$choice" == "1" ]; then
+    echo -e "${GREEN}Installerar PHP och Apache...${NC}"
+    sudo apt install -y apache2 php libapache2-mod-php
+
+    read -p "Vill du skapa en index.php fil i /var/www/html/? (j/n): " createfile
+    if [[ "$createfile" == "j" ]]; then
+        echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php > /dev/null
+        echo -e "${GREEN}index.php skapad i /var/www/html/${NC}"
+    fi
+
+    sudo systemctl enable apache2
+    sudo systemctl start apache2
+    echo -e "${GREEN}PHP + Apache installation klar!${NC}"
+
+elif [ "$choice" == "2" ]; then
+    echo -e "${GREEN}Installerar MariaDB, Apache, PHP och phpMyAdmin...${NC}"
+    sudo apt install -y mariadb-server mariadb-client apache2 php libapache2-mod-php php-mysql phpmyadmin
+
+    sudo systemctl enable apache2
+    sudo systemctl start apache2
+    sudo systemctl enable mariadb
+    sudo systemctl start mariadb
+
+    echo -e "${GREEN}MariaDB + Apache + PHP + phpMyAdmin installation klar!${NC}"
+
+elif [ "$choice" == "3" ]; then
+    echo -e "${GREEN}Installerar komplett LAMP-stack...${NC}"
+    sudo apt install -y apache2 mariadb-server mariadb-client php libapache2-mod-php php-mysql phpmyadmin ufw
+
+    # Starta och aktivera tjänster
+    sudo systemctl enable apache2
+    sudo systemctl start apache2
+    sudo systemctl enable mariadb
+    sudo systemctl start mariadb
+
+    # Aktivera Apache mod_rewrite
+    sudo a2enmod rewrite
+    sudo systemctl restart apache2
+
+    # Brandväggsregler
+    sudo ufw allow OpenSSH
+    sudo ufw allow in "Apache Full"
+    sudo ufw --force enable
+
+    # Säkra MariaDB (interaktiv)
+    echo -e "${GREEN}Kör mysql_secure_installation för att säkra din MariaDB-installation.${NC}"
+    sudo mysql_secure_installation
+
+    # Skapa index.php testfil
+    echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php > /dev/null
+
+    echo -e "${GREEN}Komplett LAMP-stack installerad och konfigurerad!${NC}"
+else
+    echo -e "${RED}Ogiltigt val, avbryter.${NC}"
+    exit 1
+fi
