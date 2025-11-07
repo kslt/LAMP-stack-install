@@ -1,62 +1,74 @@
 #!/bin/bash
 
-# Färger
-GREEN="\e[32m"
-RED="\e[31m"
-NC="\e[0m" # No Color
+clear
+cat <<'EOF'
+Hej och välkommen till LAMP-INSTALLERAREN! 🚀
 
-echo -e "${GREEN}Välkommen till installationsskriptet!${NC}"
-echo "Välj vilken installation du vill köra:"
-echo "1) PHP + Apache"
-echo "2) MariaDB + Apache + PHP + phpMyAdmin"
-echo "3) Komplett LAMP-stack (Apache + MariaDB + PHP + phpMyAdmin + säkerhet)"
-echo "4) Avbryt"
+Detta skript hjälper dig att installera olika delar av en LAMP-stack på Ubuntu/Debian:
 
+1️⃣ PHP + Apache
+2️⃣ MariaDB + Apache + PHP + phpMyAdmin
+3️⃣ Komplett LAMP-stack (Apache + MariaDB + PHP + phpMyAdmin + säkerhet)
+4️⃣ Avbryt
+
+Skriptet kommer uppdatera paketlistan och starta relevanta tjänster automatiskt.
+EOF
+
+echo ""
 read -p "Ange ditt val (1/2/3/4): " choice
 
-if [ "$choice" == "4" ]; then
-    echo -e "${RED}Avbryter installationen.${NC}"
+if [[ "$choice" == "4" ]]; then
+    echo "❌ Avbryter installationen."
     exit 0
 fi
 
-read -p "Vill du fortsätta installationen? (j/n): " confirm
-if [[ "$confirm" != "j" ]]; then
-    echo -e "${RED}Installation avbruten.${NC}"
+read -p "Vill du fortsätta installationen? (ja/nej): " confirm
+if [[ "$confirm" != "ja" && "$confirm" != "Ja" ]]; then
+    echo "❌ Installation avbruten."
     exit 0
 fi
 
+echo ""
+echo "⚙️  Uppdaterar paketlistan..."
 sudo apt update
 
-if [ "$choice" == "1" ]; then
-    echo -e "${GREEN}Installerar PHP och Apache...${NC}"
+install_php_apache() {
+    echo ""
+    echo "💻 Installerar PHP och Apache..."
     sudo apt install -y apache2 php libapache2-mod-php
 
-    read -p "Vill du skapa en index.php fil i /var/www/html/? (j/n): " createfile
-    if [[ "$createfile" == "j" ]]; then
+    read -p "Vill du skapa en index.php-fil i /var/www/html/? (ja/nej): " createfile
+    if [[ "$createfile" == "ja" || "$createfile" == "Ja" ]]; then
+        sudo mkdir -p /var/www/html
         echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php > /dev/null
-        echo -e "${GREEN}index.php skapad i /var/www/html/${NC}"
+        echo "✅ index.php skapad i /var/www/html/"
     fi
 
     sudo systemctl enable apache2
     sudo systemctl start apache2
-    echo -e "${GREEN}PHP + Apache installation klar!${NC}"
+    echo "✅ PHP + Apache installation klar!"
+}
 
-elif [ "$choice" == "2" ]; then
-    echo -e "${GREEN}Installerar MariaDB, Apache, PHP och phpMyAdmin...${NC}"
-    sudo apt install -y mariadb-server mariadb-client apache2 php libapache2-mod-php php-mysql phpmyadmin
+install_mariadb_phpmyadmin() {
+    echo ""
+    echo "💾 Installerar MariaDB, Apache, PHP och phpMyAdmin..."
+    export DEBIAN_FRONTEND=noninteractive
+    sudo apt install -y apache2 php libapache2-mod-php php-mysql mariadb-server mariadb-client phpmyadmin
 
     sudo systemctl enable apache2
     sudo systemctl start apache2
     sudo systemctl enable mariadb
     sudo systemctl start mariadb
 
-    echo -e "${GREEN}MariaDB + Apache + PHP + phpMyAdmin installation klar!${NC}"
+    echo "✅ MariaDB + Apache + PHP + phpMyAdmin installation klar!"
+}
 
-elif [ "$choice" == "3" ]; then
-    echo -e "${GREEN}Installerar komplett LAMP-stack...${NC}"
+install_complete_lamp() {
+    echo ""
+    echo "🛠️ Installerar komplett LAMP-stack..."
+    export DEBIAN_FRONTEND=noninteractive
     sudo apt install -y apache2 mariadb-server mariadb-client php libapache2-mod-php php-mysql phpmyadmin ufw
 
-    # Starta och aktivera tjänster
     sudo systemctl enable apache2
     sudo systemctl start apache2
     sudo systemctl enable mariadb
@@ -66,20 +78,42 @@ elif [ "$choice" == "3" ]; then
     sudo a2enmod rewrite
     sudo systemctl restart apache2
 
-    # Brandväggsregler
+    # Brandvägg
     sudo ufw allow OpenSSH
     sudo ufw allow in "Apache Full"
-    sudo ufw --force enable
+    sudo ufw status | grep -q "inactive" && sudo ufw --force enable
 
-    # Säkra MariaDB (interaktiv)
-    echo -e "${GREEN}Kör mysql_secure_installation för att säkra din MariaDB-installation.${NC}"
+    echo ""
+    echo "🔒 Säkerställ MariaDB-installationen med mysql_secure_installation:"
     sudo mysql_secure_installation
 
-    # Skapa index.php testfil
+    # Skapa testfil
+    sudo mkdir -p /var/www/html
     echo "<?php phpinfo(); ?>" | sudo tee /var/www/html/index.php > /dev/null
 
-    echo -e "${GREEN}Komplett LAMP-stack installerad och konfigurerad!${NC}"
-else
-    echo -e "${RED}Ogiltigt val, avbryter.${NC}"
-    exit 1
-fi
+    echo "✅ Komplett LAMP-stack installerad och konfigurerad!"
+}
+
+echo ""
+echo "----------------------------------------"
+case "$choice" in
+    1)
+        echo "Du har valt: PHP + Apache"
+        install_php_apache
+        ;;
+    2)
+        echo "Du har valt: MariaDB + Apache + PHP + phpMyAdmin"
+        install_mariadb_phpmyadmin
+        ;;
+    3)
+        echo "Du har valt: Komplett LAMP-stack"
+        install_complete_lamp
+        ;;
+    *)
+        echo "❌ Ogiltigt val, avbryter."
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "🎉 Alla valda installationer är klara!"
